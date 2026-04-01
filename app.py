@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 import socket
 
-# --- RENDER & RAM AYARLARI ---
+# --- 1. SİSTEM VE RAM AYARLARI ---
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['TENSORFLOW_INTEROP_PARALLELISM_THREADS'] = '1'
 os.environ['TENSORFLOW_INTRAOP_PARALLELISM_THREADS'] = '1'
@@ -19,32 +19,41 @@ app = Flask(__name__)
 app.secret_key = "gizli_anahtar"
 UPLOAD_FOLDER = "fotolar"
 
-# --- DOSYA YOLLARI DÜZELTMESİ (KRİTİK) ---
+# --- 2. DEĞİŞKEN TANIMLAMALARI (SMTP VE YOLLAR) ---
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = "erkanerakman137@gmail.com"
+SMTP_PASS = "nrqv nmar ciif sjgs"
+SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
+
+# Render için dinamik dosya yolları
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "model_unquant.tflite")
 LABEL_PATH = os.path.join(BASE_DIR, "labels.txt")
-# Ensure upload folder exists
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
 
-# Test DNS resolution for SMTP_HOST
+# --- 3. KONTROL FONKSİYONLARI ---
 def test_smtp_dns():
     try:
         socket.gethostbyname(SMTP_HOST)
         print(f"SMTP_HOST ({SMTP_HOST}) DNS çözümlemesi başarılı.")
+        return True
     except socket.gaierror as e:
         print(f"SMTP_HOST ({SMTP_HOST}) DNS çözümleme hatası: {e}")
-        raise RuntimeError("SMTP_HOST DNS çözümleme başarısız. Lütfen SMTP_HOST değerini kontrol edin.")
+        return False
 
-# Ensure SMTP settings are configured and DNS resolution works
-test_smtp_dns()
-if not SMTP_USER or not SMTP_PASS:
-    raise RuntimeError("SMTP ayarları eksik. Lütfen SMTP_USER ve SMTP_PASS çevre değişkenlerini ayarlayın.")
+# Klasör ve Dosya Kontrolleri
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
+if not os.path.exists(MODEL_PATH):
+    print(f"HATA: Model dosyası bulunamadı! Aranan yol: {MODEL_PATH}")
+if not os.path.exists(LABEL_PATH):
+    print(f"HATA: Label dosyası bulunamadı! Aranan yol: {LABEL_PATH}")
+
+# --- 4. VERİTABANI BAŞLATMA ---
 def init_db():
     conn = sqlite3.connect("konumlar.db")
     c = conn.cursor()
-    # users table with recovery_email
     c.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,64 +62,27 @@ def init_db():
             recovery_email TEXT
         )
     """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS konumlar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            kullanici TEXT,
-            konum TEXT
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS fotolar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            kullanici TEXT,
-            dosya_yolu TEXT,
-            yuklenme_zamani TEXT
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS password_resets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT,
-            token TEXT UNIQUE,
-            code TEXT,
-            expires_at TEXT
-        )
-    """)
-    conn.commit()
-    # best-effort: add missing columns for backwards compatibility
-    try:
-        c.execute("PRAGMA table_info(users)")
-        cols = [r[1] for r in c.fetchall()]
-        if "recovery_email" not in cols:
-            c.execute("ALTER TABLE users ADD COLUMN recovery_email TEXT")
-    except Exception:
-        pass
-    try:
-        c.execute("PRAGMA table_info(password_resets)")
-        cols2 = [r[1] for r in c.fetchall()]
-        if "code" not in cols2:
-            c.execute("ALTER TABLE password_resets ADD COLUMN code TEXT")
-    except Exception:
-        pass
+    c.execute("CREATE TABLE IF NOT EXISTS konumlar (id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici TEXT, konum TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS fotolar (id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici TEXT, dosya_yolu TEXT, yuklenme_zamani TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS password_resets (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, token TEXT UNIQUE, code TEXT, expires_at TEXT)")
     conn.commit()
     conn.close()
 
 init_db()
+test_smtp_dns()
 
-# model checks
-if not os.path.exists(MODEL_PATH):
-    raise FileNotFoundError(f"Model dosyası bulunamadı: {MODEL_PATH}")
-if not os.path.exists(LABEL_PATH):
-    raise FileNotFoundError(f"Label dosyası bulunamadı: {LABEL_PATH}")
+# --- 5. MODEL YÜKLEME ---
+try:
+    interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
+    interpreter.allocate_tensors()
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+    with open(LABEL_PATH, "r", encoding="utf-8") as f:
+        labels = [line.strip() for line in f.readlines()]
+    print("Model ve etiketler başarıyla yüklendi.")
+except Exception as e:
+    print(f"Model yüklenirken kritik hata: {e}")
 
-interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
-interpreter.allocate_tensors()
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
-
-with open(LABEL_PATH, "r", encoding="utf-8") as f:
-    labels = [line.strip() for line in f.readlines()]
 
 def tahmin_et(img_path):
     img = Image.open(img_path).resize((224, 224))
