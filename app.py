@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 import socket
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # Gereksiz logları kapatır
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['TENSORFLOW_INTEROP_PARALLELISM_THREADS'] = '1'
 os.environ['TENSORFLOW_INTRAOP_PARALLELISM_THREADS'] = '1'
 app = Flask(__name__)
