@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <title>Mantar Tanıma</title>
+    <style>
+        body {
+            background: #142850;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        h2 {
+            margin-top: 40px;
+            margin-bottom: 30px;
+            font-size: 2.2em;
+            letter-spacing: 2px;
+            z-index: 2;
+        }
+
+        .logout-link {
+            color: #00a8cc;
+            position: absolute;
+            right: 30px;
+            top: 30px;
+            z-index: 2;
+        }
+
+        form {
+            background: #27496d;
+            padding: 30px 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 2;
+        }
+
+        .drop-area {
+            border: 2px dashed #00a8cc;
+            border-radius: 8px;
+            padding: 30px 40px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #00a8cc;
+            background: #193866;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .drop-area.dragover {
+            background: #27496d;
+            border-color: #fff;
+            color: #fff;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        button {
+            background: #00a8cc;
+            color: #fff;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 6px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #007ea7;
+        }
+
+        h3, p {
+            margin-top: 30px;
+            text-align: center;
+            z-index: 2;
+        }
+
+        .file-name {
+            color: #fff;
+            margin-bottom: 10px;
+        }
+
+        #mapLink {
+            margin-bottom: 15px;
+        }
+
+        .konum-link {
+            color: #00a8cc;
+        }
+
+        .nav-links {
+            margin-top: 30px;
+            z-index: 2;
+        }
+
+        .nav-links a {
+            color: #00a8cc;
+            margin: 0 10px;
+        }
+
+        /* Görseller büyük ve kutuya yakın, simetrik olmayan */
+        .gorsel {
+            position: absolute;
+            width: 360px;
+            height: 360px;
+            object-fit: cover;
+            border-radius: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.4);
+            z-index: 1;
+        }
+
+        #g1 { top: 40px; left: 60px; }
+        #g2 { top: 100px; right: 80px; }
+        #g3 { bottom: 80px; left: 100px; }
+        #g4 { bottom: 60px; right: 120px; }
+    </style>
+</head>
+<body>
+    <!-- Görseller -->
+    <img src="{{ url_for('static', filename='download (8).jpg') }}" alt="Görsel 1" class="gorsel" id="g1">
+    <img src="{{ url_for('static', filename='download (52).jpg') }}" alt="Görsel 2" class="gorsel" id="g2">
+    <img src="{{ url_for('static', filename='download (61).jpg') }}" alt="Görsel 3" class="gorsel" id="g3">
+    <img src="{{ url_for('static', filename='download (64).jpg') }}" alt="Görsel 4" class="gorsel" id="g4">
+
+    <a href="{{ url_for('logout') }}" class="logout-link">Çıkış Yap</a>
+    <h2>Hoşgeldin, {{ username }}!</h2>
+
+    <form id="uploadForm" action="/tahmin" method="post" enctype="multipart/form-data">
+        <div class="drop-area" id="drop-area">
+            <span id="drop-text">Dosyanızı buraya sürükleyip bırakın veya tıklayın</span>
+            <div class="file-name" id="file-name"></div>
+            <input type="file" name="foto" id="fileElem" accept="image/*" required>
+        </div>
+        <button type="button" id="konumBtn" style="margin-bottom:15px;">Konumumu İşaretle</button>
+        <input type="hidden" name="konum" id="konumInput">
+        <div id="mapLink"></div>
+        <button type="submit">Tahmin Et</button>
+    </form>
+
+    <div class="nav-links">
+        <a href="{{ url_for('konumum') }}">Tüm Konumlarımı Göster</a> |
+        <a href="{{ url_for('fotolarim') }}">Fotoğraflarımı Gör</a>
+    </div>
+
+    {% if sonuc %}
+        <h3>Sonuç: {{ sonuc }}</h3>
+        <p>Doğruluk: {{ yuzde }}%</p>
+    {% endif %}
+
+    <script>
+        const dropArea = document.getElementById('drop-area');
+        const fileInput = document.getElementById('fileElem');
+        const fileName = document.getElementById('file-name');
+        const dropText = document.getElementById('drop-text');
+
+        dropArea.addEventListener('click', () => fileInput.click());
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.classList.add('dragover');
+        });
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.classList.remove('dragover');
+        });
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('dragover');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                fileName.textContent = e.dataTransfer.files[0].name;
+                dropText.style.display = "none";
+            }
+        });
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                fileName.textContent = fileInput.files[0].name;
+                dropText.style.display = "none";
+            } else {
+                fileName.textContent = "";
+                dropText.style.display = "block";
+            }
+        });
+
+        const konumBtn = document.getElementById('konumBtn');
+        const konumInput = document.getElementById('konumInput');
+        const mapLink = document.getElementById('mapLink');
+
+        konumBtn.addEventListener('click', function() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    konumInput.value = lat + "," + lon;
+                    mapLink.innerHTML = `<a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" class="konum-link">Konumumu Google Maps'te Gör</a>`;
+
+                    fetch("/konumkaydet", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ konum: lat + "," + lon })
+                    }).then(res => res.json()).then(data => {
+                        if(data.status === "ok") {
+                            mapLink.innerHTML += "<br><span style='color:#0f0;'>Konum kaydedildi!</span>";
+                        } else {
+                            mapLink.innerHTML += "<br><span style='color:#f00;'>Konum kaydedilemedi!</span>";
+                        }
+                    });
+                }, function() {
+                    mapLink.textContent = "Konum alınamadı.";
+                });
+            } else {
+                mapLink.textContent = "Tarayıcınız konum desteği sunmuyor.";
+            }
+        });
+    </script>
+</body>
+</html>
+

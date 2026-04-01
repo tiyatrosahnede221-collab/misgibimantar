@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Konumlarım</title>
+</head>
+<body style="background:#142850; color:#fff; font-family:Arial; text-align:center;">
+    <a href="{{ url_for('index') }}" style="color:#00a8cc; position:absolute; left:30px; top:30px;">← Geri</a>
+    <h2>{{ username }} - Kaydedilen Tüm Konumlarınız</h2>
+    {% if konumlar and konumlar|length > 0 %}
+        <ul style="list-style:none; padding:0;">
+        {% for konum in konumlar %}
+            <li style="margin-bottom:18px;">
+                <a href="https://www.google.com/maps?q={{ konum }}" target="_blank" style="color:#00a8cc;">Google Maps'te Gör</a>
+                <br>
+                <span style="font-size:0.95em;">Koordinatlar: {{ konum }}</span>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>Hiç konum kaydedilmemiş.</p>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Kayıt Ol</title>
+    <style>
+        body { background:#142850; color:#fff; font-family:Arial; display:flex; justify-content:center; align-items:center; height:100vh; margin:0;}
+        .box { background:#27496d; padding:36px; border-radius:10px; box-shadow:0 4px 24px rgba(0,0,0,0.2); width:380px;}
+        input, button { margin:8px 0; padding:10px; border-radius:6px; border:none; width:100%; }
+        button { background:#00a8cc; color:#fff; cursor:pointer;}
+        .note { color:#aaa; font-size:0.9em; margin-top:6px;}
+        .error { color:#f66; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Kayıt Ol</h2>
+        {% if hata %}<div class="error">{{ hata }}</div>{% endif %}
+        <form method="post" autocomplete="off">
+            <input type="text" name="username" placeholder="Kullanıcı Adı" required>
+            <input type="password" name="password" placeholder="Şifre" required>
+            <input type="email" name="recovery_email" placeholder="Kurtarma e-postası (opsiyonel)">
+            <button type="submit">Kayıt Ol</button>
+        </form>
+        <div class="note">
+            Kurtarma e-postası girerseniz "Şifremi Unuttum" akışında kod bu adrese gönderilecektir.
+        </div>
+        <div style="margin-top:12px;">
+            <a href="{{ url_for('login') }}" style="color:#00a8cc;">Zaten hesabınız var mı? Giriş Yap</a>
+        </div>
+    </div>
+</body>
+</html>

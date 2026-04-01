@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <title>MİS GİBİ MANTAR</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #142850;
+            font-family: Arial, sans-serif;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .container {
+            text-align: center;
+            z-index: 2;
+        }
+
+        h2 {
+            font-size: 32px;
+            margin: 10px 0;
+            transition: color 0.5s ease;
+        }
+
+        #animated-title {
+            margin-bottom: 10px;
+        }
+
+        .login-box {
+            background: #27496d;
+            padding: 40px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+            width: 360px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 2;
+        }
+
+        input, button {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            width: 100%;
+        }
+
+        button {
+            background: #00a8cc;
+            color: #fff;
+            font-size: 1.05em;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #007ea7;
+        }
+
+        .link {
+            color: #00a8cc;
+            display: block;
+            margin-top: 8px;
+            text-align: center;
+            text-decoration: none;
+        }
+
+        .error, .msg {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .error { color: #f55; }
+        .msg { color: #8f8; }
+
+        /* Görseller 2x büyük ve kutuya yakın, simetrik olmayan konumlar */
+        .gorsel {
+            position: absolute;
+            width: 360px;
+            height: 360px;
+            object-fit: cover;
+            border-radius: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.4);
+            z-index: 1;
+        }
+
+        #g1 { top: 40px; left: 60px; }
+        #g2 { top: 100px; right: 80px; }
+        #g3 { bottom: 80px; left: 100px; }
+        #g4 { bottom: 60px; right: 120px; }
+    </style>
+</head>
+<body>
+    <!-- Görseller -->
+    <img src="{{ url_for('static', filename='download (8).jpg') }}" alt="Görsel 1" class="gorsel" id="g1">
+    <img src="{{ url_for('static', filename='download (52).jpg') }}" alt="Görsel 2" class="gorsel" id="g2">
+    <img src="{{ url_for('static', filename='download (61).jpg') }}" alt="Görsel 3" class="gorsel" id="g3">
+    <img src="{{ url_for('static', filename='download (64).jpg') }}" alt="Görsel 4" class="gorsel" id="g4">
+
+    <!-- Ortalanmış içerik -->
+    <div class="container">
+        <h2 id="animated-title">MİS GİBİ MANTAR'a Hoşgeldin!</h2>
+        <h2>HADİ BAŞLAYALIM!</h2>
+        <h2>Hesap Oluştur yada giriş yap!</h2>
+
+        <div class="login-box">
+            {% if hata %}<div class="error">{{ hata }}</div>{% endif %}
+            {% if msg %}<div class="msg">{{ msg }}</div>{% endif %}
+            <form method="post" autocomplete="off">
+                <input type="text" name="username" placeholder="Kullanıcı Adı" required>
+                <input type="password" name="password" placeholder="Şifre" required>
+                <button type="submit">Giriş Yap</button>
+            </form>
+            <a href="{{ url_for('register') }}" class="link">Hesabın yok mu? Hemen oluştur</a>
+            <a href="{{ url_for('forgot') }}" class="link">Şifremi unuttum</a>
+        </div>
+    </div>
+
+    <!-- Başlık renk animasyonu -->
+    <script>
+        const title = document.getElementById("animated-title");
+        const colors = ["#ff4c4c", "#4caf50", "#00a8cc", "#fdd835", "#e91e63", "#9c27b0"];
+        let index = 0;
+
+        setInterval(() => {
+            title.style.color = colors[index];
+            index = (index + 1) % colors.length;
+        }, 1000);
+    </script>
+</body>
+</html>
+

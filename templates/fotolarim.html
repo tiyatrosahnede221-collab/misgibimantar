@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fotoğraflarım</title>
+    <style>
+        body { background:#142850; color:#fff; font-family:Arial; text-align:center;}
+        .photo-list { display:flex; flex-wrap:wrap; justify-content:center; gap:30px; margin-top:30px;}
+        .photo-item { background:#27496d; border-radius:10px; padding:15px; box-shadow:0 4px 24px rgba(0,0,0,0.2);}
+        img { max-width:200px; max-height:200px; border-radius:8px; display:block; margin:auto;}
+        .date { color:#00a8cc; margin-top:10px; font-size:0.95em;}
+        a { color:#00a8cc;}
+    </style>
+</head>
+<body>
+    <a href="{{ url_for('index') }}" style="color:#00a8cc; position:absolute; left:30px; top:30px;">← Geri</a>
+    <h2>{{ username }} - Yüklediğiniz Fotoğraflar</h2>
+    {% if fotolar and fotolar|length > 0 %}
+        <div class="photo-list">
+        {% for dosya_yolu, yuklenme_zamani in fotolar %}
+            <div class="photo-item">
+                <img src="{{ url_for('fotolar_serve', filename=dosya_yolu) }}" alt="Fotoğraf">
+                <div class="date">Yüklenme: {{ yuklenme_zamani }}</div>
+            </div>
+        {% endfor %}
+        </div>
+    {% else %}
+        <p>Hiç fotoğraf yüklememişsiniz.</p>
+    {% endif %}
+</body>
+</html>
