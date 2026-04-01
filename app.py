@@ -9,24 +9,20 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image
 import socket
-import os
+
+# --- RENDER & RAM AYARLARI ---
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['TENSORFLOW_INTEROP_PARALLELISM_THREADS'] = '1'
 os.environ['TENSORFLOW_INTRAOP_PARALLELISM_THREADS'] = '1'
+
 app = Flask(__name__)
 app.secret_key = "gizli_anahtar"
 UPLOAD_FOLDER = "fotolar"
 
-MODEL_PATH = "C:/Users/erkan/Downloads/pencimantar/converted_tflite/model_unquant.tflite"
-LABEL_PATH = "C:/Users/erkan/Downloads/pencimantar/converted_tflite/labels.txt"
-
-# Optional SMTP config (set as environment variables if you want real emails)
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER = "erkanerakman137@gmail.com"
-SMTP_PASS = "nrqv nmar ciif sjgs"
-SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
-
+# --- DOSYA YOLLARI DÜZELTMESİ (KRİTİK) ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "model_unquant.tflite")
+LABEL_PATH = os.path.join(BASE_DIR, "labels.txt")
 # Ensure upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
