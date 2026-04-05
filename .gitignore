@@ -1,15 +1,8 @@
-# Python gereksiz dosyaları
 __pycache__/
 *.pyc
 .env
 venv/
+.github/
 .vscode/
-.idea/
-
-# Veritabanını GitHub'a GÖNDERME (Render kendisi oluşturacak)
-# Eğer mevcut verileri taşımak istemiyorsan burası kalsın:
-konumlar.db
-
-# Fotoğrafları GitHub'a GÖNDERME (Klasör şişmesin)
 fotolar/*
 !fotolar/.gitkeep
