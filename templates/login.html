@@ -1,141 +1,131 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="utf-8">
-    <title>MİS GİBİ MANTAR</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giriş Yap | Mis Gibi Mantar</title>
     <style>
-        * {
-            box-sizing: border-box;
+        :root {
+            --primary-color: #2ecc71;
+            --secondary-color: #27ae60;
+            --bg-color: #f4f7f6;
+            --text-color: #333;
         }
 
         body {
-            margin: 0;
-            padding: 0;
-            background: #142850;
-            font-family: Arial, sans-serif;
-            color: #fff;
-            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
             display: flex;
-            align-items: center;
             justify-content: center;
-            position: relative;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
         }
 
-        .container {
+        .login-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
             text-align: center;
-            z-index: 2;
         }
 
         h2 {
-            font-size: 32px;
-            margin: 10px 0;
-            transition: color 0.5s ease;
+            color: var(--secondary-color);
+            margin-bottom: 1.5rem;
         }
 
-        #animated-title {
-            margin-bottom: 10px;
+        .form-group {
+            margin-bottom: 1rem;
+            text-align: left;
         }
 
-        .login-box {
-            background: #27496d;
-            padding: 40px 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.2);
-            width: 360px;
-            margin: 0 auto;
-            position: relative;
-            z-index: 2;
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #666;
         }
 
-        input, button {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 5px;
-            border: none;
+        input {
             width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box; /* Padding'in taşmasını engeller */
         }
 
         button {
-            background: #00a8cc;
-            color: #fff;
-            font-size: 1.05em;
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
             cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 1rem;
         }
 
         button:hover {
-            background: #007ea7;
+            background-color: var(--secondary-color);
         }
 
-        .link {
-            color: #00a8cc;
-            display: block;
-            margin-top: 8px;
-            text-align: center;
+        .links {
+            margin-top: 1.5rem;
+            font-size: 14px;
+        }
+
+        .links a {
+            color: var(--secondary-color);
             text-decoration: none;
+            margin: 0 10px;
         }
 
-        .error, .msg {
-            text-align: center;
-            margin-bottom: 10px;
+        .links a:hover {
+            text-decoration: underline;
         }
 
-        .error { color: #f55; }
-        .msg { color: #8f8; }
-
-        /* Görseller 2x büyük ve kutuya yakın, simetrik olmayan konumlar */
-        .gorsel {
-            position: absolute;
-            width: 360px;
-            height: 360px;
-            object-fit: cover;
-            border-radius: 20px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.4);
-            z-index: 1;
+        .error {
+            color: #e74c3c;
+            background: #fdeaea;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            font-size: 14px;
         }
-
-        #g1 { top: 40px; left: 60px; }
-        #g2 { top: 100px; right: 80px; }
-        #g3 { bottom: 80px; left: 100px; }
-        #g4 { bottom: 60px; right: 120px; }
     </style>
 </head>
 <body>
-    <!-- Görseller -->
-    <img src="{{ url_for('static', filename='download (8).jpg') }}" alt="Görsel 1" class="gorsel" id="g1">
-    <img src="{{ url_for('static', filename='download (52).jpg') }}" alt="Görsel 2" class="gorsel" id="g2">
-    <img src="{{ url_for('static', filename='download (61).jpg') }}" alt="Görsel 3" class="gorsel" id="g3">
-    <img src="{{ url_for('static', filename='download (64).jpg') }}" alt="Görsel 4" class="gorsel" id="g4">
 
-    <!-- Ortalanmış içerik -->
-    <div class="container">
-        <h2 id="animated-title">MİS GİBİ MANTAR'a Hoşgeldin!</h2>
-        <h2>HADİ BAŞLAYALIM!</h2>
-        <h2>Hesap Oluştur yada giriş yap!</h2>
+<div class="login-container">
+    <h2>🍄 Mantar Teşhis Sistemi</h2>
+    
+    {% if hata %}
+    <div class="error">{{ hata }}</div>
+    {% endif %}
 
-        <div class="login-box">
-            {% if hata %}<div class="error">{{ hata }}</div>{% endif %}
-            {% if msg %}<div class="msg">{{ msg }}</div>{% endif %}
-            <form method="post" autocomplete="off">
-                <input type="text" name="username" placeholder="Kullanıcı Adı" required>
-                <input type="password" name="password" placeholder="Şifre" required>
-                <button type="submit">Giriş Yap</button>
-            </form>
-            <a href="{{ url_for('register') }}" class="link">Hesabın yok mu? Hemen oluştur</a>
-            <a href="{{ url_for('forgot') }}" class="link">Şifremi unuttum</a>
+    <form action="{{ url_for('login') }}" method="POST">
+        <div class="form-group">
+            <label for="u">Kullanıcı Adı</label>
+            <input type="text" id="u" name="u" placeholder="Kullanıcı adınızı girin" required>
         </div>
+        
+        <div class="form-group">
+            <label for="p">Şifre</label>
+            <input type="password" id="p" name="p" placeholder="Şifrenizi girin" required>
+        </div>
+        
+        <button type="submit">Giriş Yap</button>
+    </form>
+
+    <div class="links">
+        <a href="{{ url_for('register') }}">Hesap Oluştur</a>
+        <a href="#">Şifremi Unuttum</a>
     </div>
+</div>
 
-    <!-- Başlık renk animasyonu -->
-    <script>
-        const title = document.getElementById("animated-title");
-        const colors = ["#ff4c4c", "#4caf50", "#00a8cc", "#fdd835", "#e91e63", "#9c27b0"];
-        let index = 0;
-
-        setInterval(() => {
-            title.style.color = colors[index];
-            index = (index + 1) % colors.length;
-        }, 1000);
-    </script>
 </body>
 </html>
-
