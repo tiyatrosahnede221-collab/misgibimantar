@@ -1,8 +1,7 @@
 __pycache__/
 *.pyc
-.env
 venv/
-.github/
+.env
 .vscode/
-fotolar/*
-!fotolar/.gitkeep
+# Veritabanını git'e ekleme ki her push'ta sıfırlanmasın (isteğe bağlı)
+# mantar_verisi.db
