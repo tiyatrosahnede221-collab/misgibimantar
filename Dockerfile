@@ -14,5 +14,5 @@ COPY . .
 # 5. Render'ın port ayarını tanımla
 ENV PORT=5000
 
-# 6. UYGULAMAYI BAŞLAT (En kritik satır burası, Status 128'i bu çözer)
-CMD ["python", "app.py"]
+# Uygulamayı Gunicorn ile başlat (Performans için en iyisi)
+CMD ["gunicorn", "--bind", "0.0.0.0:10000", "--workers", "1", "--threads", "8", "--timeout", "0", "app:app"]
