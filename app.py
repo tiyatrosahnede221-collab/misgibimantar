@@ -1,25 +1,23 @@
 import os
 import sqlite3
-import secrets
-import smtplib
-from email.message import EmailMessage
-from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
+from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
 import tensorflow as tf
 import numpy as np
 from PIL import Image
 
-# --- SİSTEM AYARLARI ---
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+# --- SİSTEM VE PERFORMANS AYARLARI ---
+# TensorFlow'un gereksiz bellek tüketmesini engeller
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 os.environ['TENSORFLOW_INTEROP_PARALLELISM_THREADS'] = '1'
 os.environ['TENSORFLOW_INTRAOP_PARALLELISM_THREADS'] = '1'
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "mantar_projesi_2026_x")
+app.secret_key = os.environ.get("SECRET_KEY", "izmir_misaki_milli_2026_x")
 
-# Dinamik Yollar
+# Klasör ve Dosya Yolları (Render Uyumluluğu)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "konumlar.db")
+DB_PATH = os.path.join(BASE_DIR, "mantar_verisi.db")
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "fotolar")
 MODEL_PATH = os.path.join(BASE_DIR, "model_unquant.tflite")
 LABEL_PATH = os.path.join(BASE_DIR, "labels.txt")
@@ -27,81 +25,101 @@ LABEL_PATH = os.path.join(BASE_DIR, "labels.txt")
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-# --- VERİTABANI ---
+# --- VERİTABANI BAŞLATMA ---
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT, recovery_email TEXT)")
-    c.execute("CREATE TABLE IF NOT EXISTS fotolar (id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici TEXT, dosya_yolu TEXT, sonuc TEXT, yuzde REAL, zaman TEXT)")
-    c.execute("CREATE TABLE IF NOT EXISTS password_resets (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, token TEXT UNIQUE, code TEXT, expires_at TEXT)")
+    # Kullanıcılar Tablosu
+    c.execute("""CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        username TEXT UNIQUE, 
+        password TEXT)""")
+    # Tahmin Geçmişi Tablosu
+    c.execute("""CREATE TABLE IF NOT EXISTS fotolar (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        kullanici TEXT, 
+        dosya_yolu TEXT, 
+        sonuc TEXT, 
+        yuzde REAL, 
+        zaman TEXT)""")
     conn.commit()
     conn.close()
 
 init_db()
 
-# --- YAPAY ZEKA ---
-labels = []
+# --- YAPAY ZEKA MOTORU (LAZY LOADING) ---
+# Modeli globalde tanımlıyoruz ama fonksiyon çağrılana kadar yüklemiyoruz
 interpreter = None
+labels = []
 
-def get_model():
+def get_model_and_labels():
     global interpreter, labels
     if interpreter is None:
-        if os.path.exists(MODEL_PATH):
+        if os.path.exists(MODEL_PATH) and os.path.exists(LABEL_PATH):
             interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
             interpreter.allocate_tensors()
             with open(LABEL_PATH, "r", encoding="utf-8") as f:
                 labels = [line.strip() for line in f.readlines()]
-    return interpreter
+        else:
+            print("HATA: Model veya labels.txt bulunamadı!")
+    return interpreter, labels
 
 def tahmin_et(img_path):
-    model = get_model()
-    if model is None: return "Model Bulunamadı", 0
+    interp, lbls = get_model_and_labels()
+    if interp is None: return "Sistem Hatası", 0
     
+    # Görsel Hazırlama (Teachable Machine Standartları)
     img = Image.open(img_path).convert("RGB").resize((224, 224))
     img_array = np.array(img, dtype=np.float32) / 255.0
     img_array = np.expand_dims(img_array, axis=0)
 
-    input_details = model.get_input_details()
-    output_details = model.get_output_details()
-    model.set_tensor(input_details[0]['index'], img_array)
-    model.invoke()
+    # Modeli Çalıştır
+    input_details = interp.get_input_details()
+    output_details = interp.get_output_details()
+    interp.set_tensor(input_details[0]['index'], img_array)
+    interp.invoke()
     
-    predictions = model.get_tensor(output_details[0]['index'])[0]
-    idx = np.argmax(predictions)
-    return labels[idx], round(float(predictions[idx]) * 100, 2)
+    # Sonucu Al
+    predictions = interp.get_tensor(output_details[0]['index'])[0]
+    best_idx = np.argmax(predictions)
+    return lbls[best_idx], round(float(predictions[best_idx]) * 100, 2)
 
-# --- SAYFALAR (ROUTES) ---
+# --- SAYFA YÖNLENDİRMELERİ ---
+
 @app.route("/")
 def home():
-    return redirect(url_for("index")) if "username" in session else redirect(url_for("login"))
+    if "username" in session:
+        return redirect(url_for("index"))
+    return redirect(url_for("login"))
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    hata = None
     if request.method == "POST":
-        u, p = request.form["username"], request.form["password"]
+        u = request.form.get("username")
+        p = request.form.get("password")
         conn = sqlite3.connect(DB_PATH)
         user = conn.execute("SELECT * FROM users WHERE username=? AND password=?", (u, p)).fetchone()
         conn.close()
         if user:
             session["username"] = u
             return redirect(url_for("index"))
-        hata = "Hatalı kullanıcı adı veya şifre!"
-    return render_template("login.html", hata=hata, msg=request.args.get("msg"))
+        return render_template("login.html", hata="Kullanıcı adı veya şifre yanlış!")
+    return render_template("login.html")
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    hata = None
     if request.method == "POST":
-        u, p, e = request.form["username"], request.form["password"], request.form.get("recovery_email")
+        u = request.form.get("username")
+        p = request.form.get("password")
         try:
             conn = sqlite3.connect(DB_PATH)
-            conn.execute("INSERT INTO users (username, password, recovery_email) VALUES (?, ?, ?)", (u, p, e))
+            conn.execute("INSERT INTO users (username, password) VALUES (?, ?)", (u, p))
             conn.commit()
             conn.close()
-            return redirect(url_for("login", msg="Kayıt başarılı!"))
-        except: hata = "Bu kullanıcı adı zaten alınmış."
-    return render_template("register.html", hata=hata)
+            return redirect(url_for("login"))
+        except:
+            return render_template("register.html", hata="Bu kullanıcı adı zaten alınmış.")
+    return render_template("register.html")
 
 @app.route("/index")
 def index():
@@ -112,17 +130,23 @@ def index():
 def tahmin():
     if "username" not in session: return redirect(url_for("login"))
     file = request.files.get("foto")
-    if file:
-        fname = f"{session['username']}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.filename}"
-        path = os.path.join(UPLOAD_FOLDER, fname)
-        file.save(path)
-        res, prob = tahmin_et(path)
+    if file and file.filename != '':
+        # Dosyayı Kaydet
+        filename = f"{session['username']}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
+        save_path = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(save_path)
+        
+        # Tahmin Yap
+        sonuc_metni, olasilik = tahmin_et(save_path)
+        
+        # Veritabanına Yaz
         conn = sqlite3.connect(DB_PATH)
         conn.execute("INSERT INTO fotolar (kullanici, dosya_yolu, sonuc, yuzde, zaman) VALUES (?, ?, ?, ?, ?)", 
-                     (session["username"], fname, res, prob, datetime.now().isoformat()))
+                     (session["username"], filename, sonuc_metni, olasilik, datetime.now().strftime("%d-%m-%Y %H:%M")))
         conn.commit()
         conn.close()
-        return render_template("index.html", sonuc=res, yuzde=prob, username=session["username"])
+        
+        return render_template("index.html", sonuc=sonuc_metni, yuzde=olasilik, username=session["username"])
     return redirect(url_for("index"))
 
 @app.route("/fotolarim")
@@ -133,7 +157,7 @@ def fotolarim():
     conn.close()
     return render_template("fotolarim.html", fotolar=rows, username=session["username"])
 
-@app.route("/fotolar/<path:filename>")
+@app.route("/yuklemeler/<filename>")
 def serve_foto(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
@@ -143,5 +167,6 @@ def logout():
     return redirect(url_for("login"))
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    # Render Port Ayarı
+    port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
