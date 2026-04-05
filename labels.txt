@@ -1,3 +1,2 @@
-0 Mantar_Turu_1
-1 Mantar_Turu_2
-2 Zehirli_Mantar
+Zehirli Mantar
+Yenebilir Mantar
