@@ -1,2 +1,3 @@
-0 zehirli mantar
-1 zehirsiz mantar
+0 Mantar_Turu_1
+1 Mantar_Turu_2
+2 Zehirli_Mantar
