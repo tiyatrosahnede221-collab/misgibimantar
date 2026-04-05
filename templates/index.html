@@ -1,104 +1,19 @@
 <!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mantar Teşhis | Mis Gibi Mantar</title>
-    <style>
-        :root {
-            --primary-color: #2ecc71;
-            --secondary-color: #27ae60;
-            --danger-color: #e74c3c;
-            --bg-color: #f4f7f6;
-        }
-
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            background-color: var(--bg-color);
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        nav {
-            width: 100%;
-            background: white;
-            padding: 1rem;
-            display: flex;
-            justify-content: space-around;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            margin-bottom: 2rem;
-        }
-
-        nav a {
-            text-decoration: none;
-            color: var(--secondary-color);
-            font-weight: bold;
-        }
-
-        .container {
-            background: white;
-            padding: 2rem;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-            width: 90%;
-            max-width: 500px;
-            text-align: center;
-        }
-
-        .upload-section {
-            border: 2px dashed #ddd;
-            padding: 2rem;
-            border-radius: 10px;
-            margin-bottom: 1.5rem;
-            transition: 0.3s;
-        }
-
-        .upload-section:hover {
-            border-color: var(--primary-color);
-        }
-
-        input[type="file"] {
-            margin: 1rem 0;
-        }
-
-        button {
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            width: 100%;
-        }
-
-        button:hover {
-            background: var(--secondary-color);
-        }
-
-        .result-box {
-            margin-top: 2rem;
-            padding: 1.5rem;
-            border-radius: 10px;
-            background: #e8f8f5;
-            border: 1px solid var(--primary-color);
-        }
-
-        .result-box h3 {
-            margin: 0 0 10px 0;
-            color: var(--secondary-color);
-        }
-
-        .prob-bar {
-            background: #ddd;
-            height: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
-            overflow: hidden;
-        }
-
-        .prob-fill {
-            background: var(--primary-color);
-            height: 100%;
+<html>
+<body style="font-family:sans-serif; text-align:center;">
+    <nav style="background:#eee; padding:10px;">
+        Hoş geldin <b>{{ user }}</b> | <a href="{{ url_for('fotolarim') }}">Geçmiş</a> | <a href="{{ url_for('logout') }}">Çıkış</a>
+    </nav>
+    <h2>🍄 Mantar Teşhisi</h2>
+    <form action="{{ url_for('tahmin') }}" method="POST" enctype="multipart/form-data">
+        <input type="file" name="foto" required><br><br>
+        <button type="submit" style="padding:15px; background:#2ecc71; color:white; border:none; cursor:pointer;">Analiz Et</button>
+    </form>
+    {% if sonuc %}
+        <div style="margin-top:20px; padding:20px; border:2px solid #2ecc71;">
+            <h3>Sonuç: {{ sonuc }}</h3>
+            <p>Doğruluk Oranı: %{{ yuzde }}</p>
+        </div>
+    {% endif %}
+</body>
+</html>
