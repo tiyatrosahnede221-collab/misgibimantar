@@ -1,7 +1,0 @@
-__pycache__/
-*.pyc
-.env
-veritabani.db
-mantar_v2.db
-static/uploads/*
-!static/uploads/.gitkeep
