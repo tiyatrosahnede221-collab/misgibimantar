@@ -2,125 +2,67 @@ import os
 import sqlite3
 import secrets
 import smtplib
-from email.message import EmailMessage
-from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
-import tensorflow as tf
-import numpy as np
-from PIL import Image
 import socket
+import numpy as np
+from datetime import datetime, timedelta
+from email.message import EmailMessage
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
+from PIL import Image
+
+# TFLite Runtime: TensorFlow'un 500MB'lık yükünden kurtulup sadece 15MB ile çalışmamızı sağlar.
+try:
+    from tflite_runtime.interpreter import Interpreter
+except ImportError:
+    import tensorflow as tf
+    Interpreter = tf.lite.Interpreter
 
 app = Flask(__name__)
-app.secret_key = "gizli_anahtar"
-UPLOAD_FOLDER = "fotolar"
+app.secret_key = os.environ.get("SECRET_KEY", "mantar-projesi-gizli-anahtar-123")
 
-# --- GÜNCELLEME: Windows yolları Linux (Render) üzerinde çalışmaz ---
-# Model ve labels dosyalarını GitHub projenin ANA DİZİNİNE yüklemiş olmalısın.
-MODEL_PATH = os.path.join(os.getcwd(), "model_unquant.tflite")
-LABEL_PATH = os.path.join(os.getcwd(), "labels.txt")
+# --- KLASÖR VE DOSYA AYARLARI ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "fotolar")
+MODEL_PATH = os.path.join(BASE_DIR, "model_unquant.tflite")
+LABEL_PATH = os.path.join(BASE_DIR, "labels.txt")
+DB_PATH = os.path.join(BASE_DIR, "konumlar.db")
 
-# Optional SMTP config
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER = "erkanerakman137@gmail.com"
-SMTP_PASS = "nrqv nmar ciif sjgs"
-SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
-
-# Ensure upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-# Test DNS resolution for SMTP_HOST
-def test_smtp_dns():
-    try:
-        socket.gethostbyname(SMTP_HOST)
-        print(f"SMTP_HOST ({SMTP_HOST}) DNS çözümlemesi başarılı.")
-    except socket.gaierror as e:
-        print(f"SMTP_HOST ({SMTP_HOST}) DNS çözümleme hatası: {e}")
-        # Render kurulumunda DNS bazen geç gelebilir, bu yüzden hata fırlatmak yerine uyaralım
-        print("Uyarı: SMTP DNS çözülemedi, e-posta gönderimi başarısız olabilir.")
+# --- SMTP AYARLARI ---
+SMTP_HOST = "smtp.gmail.com"
+SMTP_PORT = 587
+SMTP_USER = "erkanerakman137@gmail.com"
+SMTP_PASS = "nrqv nmar ciif sjgs" # Uygulama şifresi
 
-# Ensure SMTP settings are configured
-if not SMTP_USER or not SMTP_PASS:
-    print("HATA: SMTP ayarları eksik.")
-
+# --- VERİTABANI BAŞLATMA ---
 def init_db():
-    conn = sqlite3.connect("konumlar.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE,
-            password TEXT,
-            recovery_email TEXT
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS konumlar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            kullanici TEXT,
-            konum TEXT
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS fotolar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            kullanici TEXT,
-            dosya_yolu TEXT,
-            yuklenme_zamani TEXT
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS password_resets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT,
-            token TEXT UNIQUE,
-            code TEXT,
-            expires_at TEXT
-        )
-    """)
-    conn.commit()
-    try:
-        c.execute("PRAGMA table_info(users)")
-        cols = [r[1] for r in c.fetchall()]
-        if "recovery_email" not in cols:
-            c.execute("ALTER TABLE users ADD COLUMN recovery_email TEXT")
-    except Exception:
-        pass
-    try:
-        c.execute("PRAGMA table_info(password_resets)")
-        cols2 = [r[1] for r in c.fetchall()]
-        if "code" not in cols2:
-            c.execute("ALTER TABLE password_resets ADD COLUMN code TEXT")
-    except Exception:
-        pass
+    c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT, recovery_email TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS konumlar (id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici TEXT, konum TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS fotolar (id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici TEXT, dosya_yolu TEXT, yuklenme_zamani TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS password_resets (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, token TEXT UNIQUE, code TEXT, expires_at TEXT)")
     conn.commit()
     conn.close()
 
 init_db()
 
-# Model dosyalarının varlığını kontrol et
-if not os.path.exists(MODEL_PATH):
-    print(f"HATA: Model dosyası bulunamadı: {MODEL_PATH}. Lütfen GitHub'a yükleyin.")
-if not os.path.exists(LABEL_PATH):
-    print(f"HATA: Label dosyası bulunamadı: {LABEL_PATH}. Lütfen GitHub'a yükleyin.")
-
-# Model yükleme
-interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
-interpreter.allocate_tensors()
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
-
-with open(LABEL_PATH, "r", encoding="utf-8") as f:
-    labels = [line.strip() for line in f.readlines()]
+# --- MODEL YÜKLEME ---
+# Sunucu başlarken modeli bir kez yükler (RAM dostu)
+if os.path.exists(MODEL_PATH) and os.path.exists(LABEL_PATH):
+    interpreter = Interpreter(model_path=MODEL_PATH)
+    interpreter.allocate_tensors()
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+    with open(LABEL_PATH, "r", encoding="utf-8") as f:
+        labels = [line.strip() for line in f.readlines()]
+else:
+    print("UYARI: Model veya labels dosyası bulunamadı!")
 
 def tahmin_et(img_path):
-    img = Image.open(img_path).resize((224, 224))
+    img = Image.open(img_path).convert("RGB").resize((224, 224))
     img = np.array(img, dtype=np.float32) / 255.0
-    if img.ndim == 2:
-        img = np.stack([img, img, img], axis=-1)
-    if img.shape[-1] == 4:
-        img = img[..., :3]
     img = np.expand_dims(img, axis=0)
 
     interpreter.set_tensor(input_details[0]['index'], img)
@@ -128,86 +70,22 @@ def tahmin_et(img_path):
     output = interpreter.get_tensor(output_details[0]['index'])[0]
     index = int(np.argmax(output))
     yuzde = round(float(output[index]) * 100, 2)
-    return labels[index], yuzde
+    
+    # Label dosyasındaki sıralamaya göre ismi döndürür
+    label_text = labels[index] if index < len(labels) else "Bilinmiyor"
+    return label_text, yuzde
 
-# --- Utility functions for reset ---
-def create_reset_entry(username, hours_valid=1):
-    token = secrets.token_urlsafe(24)
-    code = f"{secrets.randbelow(10**6):06d}"
-    expires_at = (datetime.utcnow() + timedelta(hours=hours_valid)).isoformat()
-    conn = sqlite3.connect("konumlar.db")
-    c = conn.cursor()
-    c.execute("INSERT INTO password_resets (username, token, code, expires_at) VALUES (?, ?, ?, ?)",
-              (username, token, code, expires_at))
-    conn.commit()
-    conn.close()
-    return token, code, expires_at
-
-def validate_token(token):
-    conn = sqlite3.connect("konumlar.db")
-    c = conn.cursor()
-    c.execute("SELECT username, expires_at FROM password_resets WHERE token=?", (token,))
-    row = c.fetchone()
-    conn.close()
-    if not row:
-        return None
-    username, expires_at = row
-    try:
-        if datetime.fromisoformat(expires_at) < datetime.utcnow():
-            return None
-    except Exception:
-        return None
-    return username
-
-def validate_code(username, code):
-    conn = sqlite3.connect("konumlar.db")
-    c = conn.cursor()
-    c.execute("SELECT token, expires_at FROM password_resets WHERE username=? AND code=? ORDER BY id DESC LIMIT 1", (username, code))
-    row = c.fetchone()
-    conn.close()
-    if not row:
-        return None
-    token, expires_at = row
-    try:
-        if datetime.fromisoformat(expires_at) < datetime.utcnow():
-            return None
-    except Exception:
-        return None
-    return token
-
-def delete_token(token):
-    conn = sqlite3.connect("konumlar.db")
-    c = conn.cursor()
-    c.execute("DELETE FROM password_resets WHERE token=?", (token,))
-    conn.commit()
-    conn.close()
-
-def send_email(to_address, subject, body):
-    msg = EmailMessage()
-    msg["From"] = SMTP_FROM
-    msg["To"] = to_address
-    msg["Subject"] = subject
-    msg.set_content(body)
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASS)
-        server.send_message(msg)
-
-# --- Routes ---
-@app.route("/", methods=["GET"])
+# --- ROUTER (SAYFA YÖNETİMİ) ---
+@app.route("/")
 def home():
-    if "username" in session:
-        return redirect(url_for("index"))
-    return redirect(url_for("login"))
+    return redirect(url_for("index")) if "username" in session else redirect(url_for("login"))
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     hata = None
-    msg = request.args.get("msg")
     if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
-        conn = sqlite3.connect("konumlar.db")
+        username, password = request.form["username"], request.form["password"]
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
         user = c.fetchone()
@@ -215,166 +93,56 @@ def login():
         if user:
             session["username"] = username
             return redirect(url_for("index"))
-        else:
-            hata = "Kullanıcı adı veya şifre yanlış!"
-    return render_template("login.html", hata=hata, msg=msg)
+        hata = "Kullanıcı adı veya şifre yanlış!"
+    return render_template("login.html", hata=hata)
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
     hata = None
     if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
-        recovery_email = request.form.get("recovery_email")
+        username, password = request.form["username"], request.form["password"]
+        email = request.form.get("recovery_email")
         try:
-            conn = sqlite3.connect("konumlar.db")
+            conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
-            c.execute("INSERT INTO users (username, password, recovery_email) VALUES (?, ?, ?)",
-                      (username, password, recovery_email))
+            c.execute("INSERT INTO users (username, password, recovery_email) VALUES (?, ?, ?)", (username, password, email))
             conn.commit()
             conn.close()
-            return redirect(url_for("login", msg="Kayıt başarılı. Giriş yapabilirsiniz."))
-        except sqlite3.IntegrityError:
-            hata = "Bu kullanıcı adı zaten alınmış!"
+            return redirect(url_for("login", msg="Başarılı!"))
+        except:
+            hata = "Bu kullanıcı adı zaten mevcut."
     return render_template("register.html", hata=hata)
 
-@app.route("/logout")
-def logout():
-    session.pop("username", None)
-    return redirect(url_for("login"))
-
-@app.route("/index", methods=["GET"])
+@app.route("/index")
 def index():
-    if "username" not in session:
-        return redirect(url_for("login"))
+    if "username" not in session: return redirect(url_for("login"))
     return render_template("index.html", username=session["username"])
 
 @app.route("/tahmin", methods=["POST"])
 def tahmin():
-    if "username" not in session:
-        return redirect(url_for("login"))
+    if "username" not in session: return redirect(url_for("login"))
     dosya = request.files["foto"]
-    dosya_adi = f"{session['username']}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{dosya.filename}"
-    yol = os.path.join(UPLOAD_FOLDER, dosya_adi)
-    dosya.save(yol)
-    sonuc, yuzde = tahmin_et(yol)
-    conn = sqlite3.connect("konumlar.db")
-    c = conn.cursor()
-    c.execute("INSERT INTO fotolar (kullanici, dosya_yolu, yuklenme_zamani) VALUES (?, ?, ?)",
-              (session["username"], dosya_adi, datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
-    return render_template("index.html", sonuc=sonuc, yuzde=yuzde, username=session["username"])
-
-@app.route("/fotolarim")
-def fotolarim():
-    if "username" not in session:
-        return redirect(url_for("login"))
-    conn = sqlite3.connect("konumlar.db")
-    c = conn.cursor()
-    c.execute("SELECT dosya_yolu, yuklenme_zamani FROM fotolar WHERE kullanici=? ORDER BY id DESC", (session["username"],))
-    fotolar = c.fetchall()
-    conn.close()
-    return render_template("fotolarim.html", fotolar=fotolar, username=session["username"])
-
-@app.route("/fotolar/<path:filename>")
-def fotolar_serve(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
-
-@app.route("/forgot", methods=["GET", "POST"])
-def forgot():
-    info = None
-    show_code = None
-    if request.method == "POST":
-        username = request.form.get("username")
-        conn = sqlite3.connect("konumlar.db")
+    if dosya:
+        dosya_adi = f"{session['username']}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{dosya.filename}"
+        yol = os.path.join(UPLOAD_FOLDER, dosya_adi)
+        dosya.save(yol)
+        sonuc, yuzde = tahmin_et(yol)
+        
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute("SELECT recovery_email FROM users WHERE username=?", (username,))
-        row = c.fetchone()
-        conn.close()
-        if not row:
-            info = "Bu kullanıcı adıyla kayıtlı bir e-posta bulunamadı."
-        else:
-            recovery_email = row[0]
-            if not recovery_email:
-                info = "Bu kullanıcı için kayıtlı bir kurtarma e-posta adresi yok."
-            else:
-                token, code, expires_at = create_reset_entry(username)
-                try:
-                    body = f"Şifre sıfırlama kodunuz: {code}\nLink: {url_for('reset_password', token=token, _external=True)}"
-                    send_email(recovery_email, "Şifre Sıfırlama Kodu", body)
-                    info = "Reset kodu e-postaya gönderildi."
-                except Exception as e:
-                    show_code = code
-                    info = f"E-posta gönderilemedi. Kod: {code}"
-    return render_template("forgot_password.html", info=info, reset_link=None, show_code=show_code)
-
-@app.route("/verify_code", methods=["POST"])
-def verify_code():
-    username = request.form.get("username")
-    code = request.form.get("code")
-    token = validate_code(username, code)
-    if not token:
-        return render_template("forgot_password.html", info="Kod geçersiz.", reset_link=None)
-    return redirect(url_for("reset_password", token=token))
-
-@app.route("/reset/<token>", methods=["GET", "POST"])
-def reset_password(token):
-    username = validate_token(token)
-    if not username:
-        return render_template("reset_password.html", error="Geçersiz token.", token=None)
-    if request.method == "POST":
-        new_password = request.form.get("password")
-        conn = sqlite3.connect("konumlar.db")
-        c = conn.cursor()
-        c.execute("UPDATE users SET password=? WHERE username=?", (new_password, username))
+        c.execute("INSERT INTO fotolar (kullanici, dosya_yolu, yuklenme_zamani) VALUES (?, ?, ?)", 
+                  (session["username"], dosya_adi, datetime.now().isoformat()))
         conn.commit()
         conn.close()
-        delete_token(token)
-        return redirect(url_for("login", msg="Şifre başarıyla değiştirildi."))
-    return render_template("reset_password.html", username=username, token=token, error=None)
+        return render_template("index.html", sonuc=sonuc, yuzde=yuzde, username=session["username"])
+    return redirect(url_for("index"))
 
-@app.route("/konumkaydet", methods=["POST"])
-def konumkaydet():
-    if "username" not in session:
-        return jsonify({"status": "error", "msg": "Giriş yapmalısınız!"}), 401
-    data = request.get_json()
-    kullanici = session["username"]
-    konum = data.get("konum")
-    if kullanici and konum:
-        conn = sqlite3.connect("konumlar.db")
-        c = conn.cursor()
-        c.execute("INSERT INTO konumlar (kullanici, konum) VALUES (?, ?)", (kullanici, konum))
-        conn.commit()
-        conn.close()
-        return jsonify({"status": "ok"})
-    return jsonify({"status": "error"}), 400
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
-@app.route("/konumum", methods=["GET"])
-def konumum():
-    if "username" not in session: 
-        return redirect(url_for("login"))
-    kullanici = session["username"]
-    conn = sqlite3.connect("konumlar.db")
-    c = conn.cursor()
-    c.execute("SELECT konum FROM konumlar WHERE kullanici=? ORDER BY id DESC", (kullanici,))
-    konumlar = [row[0] for row in c.fetchall()]
-    conn.close()
-    return render_template("konumum.html", konumlar=konumlar, username=kullanici)
-
-@app.route("/test_email", methods=["GET"])
-def test_email():
-    try:
-        send_email(SMTP_USER, "SMTP Test", "Bağlantı başarılı.")
-        return "Test e-postası başarıyla gönderildi."
-    except Exception as e:
-        return f"Hata: {e}"
-
-# --- GÜNCELLEME: Render için Port Ayarı ---
-import os
-
+# Render için port ayarı
 if __name__ == "__main__":
-    # Render portu otomatik atar, bulamazsa 10000 kullanır
     port = int(os.environ.get("PORT", 10000))
-    # host='0.0.0.0' dış dünyadan erişim için şarttır
     app.run(host='0.0.0.0', port=port)
