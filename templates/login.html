@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mantar Teşhis</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #28a745;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .login-container {
+            background-color: white;
+            width: 400px;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        .login-container img {
+            width: 80px;
+            margin: 10px;
+        }
+
+        .login-container h1 {
+            font-size: 24px;
+            color: black; /* Renk siyah olarak değiştirildi */
+            margin-bottom: 10px;
+        }
+
+        .login-container p {
+            font-size: 14px;
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+
+        .login-container input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+        }
+
+        .login-container button {
+            width: 100%;
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .login-container button:hover {
+            background-color: #218838;
+        }
+
+        .login-container a {
+            display: block;
+            margin-top: 10px;
+            color: #28a745;
+            text-decoration: none;
+        }
+
+        .login-container a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <img src="{{ url_for('static', filename='fotolar/okul_logo.png') }}" alt="Okul Logosu">
+        <img src="{{ url_for('static', filename='fotolar/tubitak_logo.png') }}" alt="TÜBİTAK Logosu">
+        <h1>Mantar Teşhis</h1>
+        <p>Konak Miskal-i Milli O.O.</p>
+        <form method="post" autocomplete="off">
+            <input type="text" name="username" placeholder="Kullanıcı Adı" required>
+            <input type="password" name="password" placeholder="Şifre" required>
+            <button type="submit">Giriş Yap</button>
+        </form>
+        <a href="{{ url_for('register') }}">Hesap Oluştur</a>
+        <a href="{{ url_for('forgot') }}">Şifremi Unuttum</a>
+    </div>
+</body>
+</html>
+
