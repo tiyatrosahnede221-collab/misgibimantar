@@ -371,7 +371,10 @@ def test_email():
         return f"Hata: {e}"
 
 # --- GÜNCELLEME: Render için Port Ayarı ---
+import os
+
 if __name__ == "__main__":
-    # Render PORT çevre değişkenini kullanır, yoksa varsayılan 10000 (Gunicorn ayarına uyumlu)
+    # Render portu otomatik atar, bulamazsa 10000 kullanır
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    # host='0.0.0.0' dış dünyadan erişim için şarttır
+    app.run(host='0.0.0.0', port=port)
