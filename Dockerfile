@@ -1,21 +1,26 @@
-# Use the official Python image as a base image
+# 1. Daha stabil ve hafif bir taban kullanıyoruz
 FROM python:3.9-slim
 
-# Set the working directory in the container
+# 2. TensorFlow ve OpenCV gibi kütüphanelerin ihtiyaç duyduğu sistem paketlerini ekliyoruz
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# 3. Çalışma dizinini ayarla
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
-COPY . /app
-
-# Install any needed packages specified in requirements.txt
+# 4. Pip'i güncelle ve bağımlılıkları yükle (Hata payını azaltır)
+COPY requirements.txt .
+RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose the port the app runs on
-EXPOSE 5000
+# 5. Tüm proje dosyalarını kopyala
+COPY . .
 
-# Define environment variable
-ENV NAME World
+# 6. Render için portu 10000 olarak ayarla (Render'ın standart portu budur)
+EXPOSE 10000
 
-# Run the application
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
-
+# 7. Kritik Değişiklik: Worker sayısını 1'e düşürüp thread ekledik.
+# Bu sayede RAM kullanımı azalır ama uygulama aynı anda birden fazla işi yapabilir.
+CMD ["gunicorn", "--bind", "0.0.0.0:10000", "--workers", "1", "--threads", "4", "--timeout", "120", "app:app"]
